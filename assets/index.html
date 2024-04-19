@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor Draft</title>
+    <style>
+        /* Basic styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .voted-out-player {
+            text-decoration: line-through;
+        }
+        .header-image {
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img class="header-image" src="survivor.png" alt="Survivor Logo">
+        <h2>Survivor Draft</h2>
+        <div id="drafters"></div>
+    </div>
+
+    <script>
+        // Fetch data from backend endpoints
+        fetch('/api/drafters')
+            .then(response => response.text())
+            .then(draftersText => {
+                // Split the comma-separated string into an array of drafters
+                const drafters = draftersText.split(',');
+
+                // Loop through each drafter
+                drafters.forEach(drafter => {
+                    // Create a new element for each drafter
+                    const drafterElement = document.createElement('div');
+                    drafterElement.innerHTML = `<h3>${drafter}</h3><ul id="${drafter}-drafts"></ul>`;
+                    document.getElementById('drafters').appendChild(drafterElement);
+
+                    // Fetch drafted players for this drafter
+                    fetch(`/api/drafted/${drafter}`)
+                        .then(response => response.text())
+                        .then(draftedText => {
+                            // Parse the text and split it into an array
+                            let draftedPlayers = draftedText.split(',');
+                            // remove empty elements
+                            draftedPlayers = draftedPlayers.filter(player => player.trim() !== '' && player !== 'Not Found');
+                            console.log("Drafted players:", draftedPlayers);
+
+                            // Loop through drafted players and display them
+                            draftedPlayers.forEach(player => {
+                                let playerElement = document.createElement('li');
+                                let playerName = player.trim(); // Remove leading/trailing spaces
+                                const status = playerName.endsWith('+'); // Check if player is still in the game
+                                playerName = playerName.replace(/[+-]/g, ''); // Remove '+' or '-'
+                                playerElement.textContent = playerName;
+                                if (!status) {
+                                    playerElement.classList.add('voted-out-player'); // Apply class for strikethrough
+                                }
+                                document.getElementById(`${drafter}-drafts`).appendChild(playerElement);
+                            });
+                        });
+                });
+            })
+            .catch(error => console.error('Error fetching data:', error));
+    </script>
+</body>
+</html>
