@@ -1,129 +1,208 @@
+use std::collections::HashMap;
+
+use anyhow::Context;
+use chrono::{NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
 use spin_sdk::http::{IntoResponse, Request, Response};
 use spin_sdk::{
     http::{Params, Router},
     http_component,
-    key_value::Store,
+    sqlite::Connection,
+    variables,
 };
 
-const DRAFTERS: &str = "drafters";
-const STILL_ALIVE: &str = "still_alive";
-const PLAYERS: &str = "players";
+// TODO make this a Spin application variable
+const NUMBER_OF_DRAFTS: u32 = 3;
+const SQLITE_DATE_FMT: &str = "%Y-%m-%d";
+const DRAFT_DEADLINE_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
+
+#[derive(Serialize, Debug, Clone)]
+struct Player {
+    id: u32,
+    name: String,
+    voted_out: bool,
+}
+
+#[derive(Serialize, Debug)]
+struct Drafter {
+    name: String,
+    season: i32,
+    players: Vec<Player>,
+}
+
+#[derive(Deserialize)]
+struct DraftRequest {
+    drafter: String,
+    players: Vec<String>,
+}
 
 #[http_component]
 async fn handle_survivor_draft(req: Request) -> anyhow::Result<impl IntoResponse> {
     let mut router = Router::new();
     router.get("/api/drafters", get_drafters);
-    router.get("/api/drafted/:drafter", get_drafted_for_drafter);
-    router.post("/api/join/:drafter", join_draft);
-    router.post("/api/leave/:drafter", leave_draft);
-    router.post("/api/players", set_players);
-    router.post("/api/vote-out/:player", vote_out);
+    router.get("/api/players", get_players);
+    router.post("/api/join", join_draft);
+    router.post("/api/vote-out", vote_out);
 
     Ok(router.handle(req))
 }
-// /players
-pub fn set_players(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
-    let body = req.body();
-    let players = String::from_utf8(body.into())?;
-    // Ensure at least one player is drafted
-    if players.is_empty() {
-        return Ok(Response::new(400, "No added players".to_string()));
-    }
-    let store = Store::open_default()?;
-    // ensure only characters and commas in the string
-    for c in players.chars() {
-        if !c.is_alphabetic() && c != ',' {
-            return Ok(Response::new(400, "Invalid player name".to_string()));
-        }
-    }
-    store.set(PLAYERS, body)?;
-    store.set(STILL_ALIVE, body)?;
-    Ok(Response::new(200, "Players added".to_string()))
-}
 
-// /vote-out/:player
-pub fn vote_out(_req: Request, params: Params) -> anyhow::Result<impl IntoResponse> {
-    let player = params.get("player").expect("PLAYER");
-    let store = Store::open_default()?;
-    let still_alive = String::from_utf8(store.get(STILL_ALIVE)?.unwrap_or_default())?;
-    let still_alive = still_alive
-        .split(',')
-        .filter(|p| p != &player)
-        .map(|x| x.to_string() + ",")
-        .collect::<String>();
-    let store = Store::open_default()?;
-    store.set(STILL_ALIVE, still_alive.as_bytes())?;
+// /vote-out/
+pub fn vote_out(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+    let player = String::from_utf8(req.body().into())?;
+    let season = current_season()?;
+    let conn = Connection::open_default()?;
+    let date = Utc::now().naive_utc().date();
+    let query = format!(
+        "UPDATE players SET voted_out = '{date}' WHERE name = '{player}' AND season = {season};"
+    );
+    conn.execute(&query, &[])?;
     Ok(Response::new(
         200,
         format!("Player {} voted out", player).to_string(),
     ))
 }
 
+fn current_season() -> anyhow::Result<i32> {
+    let season = variables::get("season").context("could not get season")?;
+    season
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Configured season cannot be parsed as i32"))
+}
+
+fn open_draft() -> anyhow::Result<bool> {
+    let deadline = variables::get("draft_deadline").context("could not get draft_deadline")?;
+    parse_date(Some(&deadline), DRAFT_DEADLINE_DATE_FORMAT)
+        .map(|date| date.unwrap() > Utc::now().naive_utc().date())
+}
+
+// /players
+pub fn get_players(_req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+    let season = current_season()?;
+    let conn = Connection::open_default()?;
+    let query = format!("SELECT * from players WHERE season = {season};");
+    let rowset = conn.execute(&query, &[])?;
+
+    let players: Vec<Player> = rowset
+        .rows()
+        .map(|row| Player {
+            id: row.get::<u32>("id").unwrap(),
+            name: row.get::<&str>("name").unwrap().to_owned(),
+            voted_out: parse_date(row.get::<&str>("voted_out"), SQLITE_DATE_FMT)
+                .expect("could not parse date")
+                .is_some(),
+        })
+        .collect();
+    let body = serde_json::to_string(&players)?;
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .body(body)
+        .build())
+}
+
 // /drafters
 pub fn get_drafters(_req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
-    let store = Store::open_default()?;
-    let drafters = String::from_utf8(store.get(DRAFTERS)?.unwrap_or_default())?;
-    Ok(Response::new(200, drafters))
+    let season = current_season()?;
+    let conn = Connection::open_default()?;
+    let query = format!(
+        "SELECT 
+  d.name AS drafter_name,
+  d.season AS drafter_season,
+  d.id AS drafter_id,
+  p.id AS player_id,
+  p.name AS player_name,
+  p.season AS player_season,
+  p.voted_out AS player_voted_out
+FROM drafters d
+JOIN drafterDrafts dd ON d.id = dd.drafter_id
+JOIN players p ON dd.player_id = p.id
+WHERE p.season = {season};"
+    );
+    let rowset = conn.execute(&query, &[])?;
+    let mut map: HashMap<u32, Drafter> = HashMap::new();
+
+    rowset.rows().for_each(|row| {
+        let id = row.get::<u32>("drafter_id").unwrap();
+        let player = Player {
+            id: row.get::<u32>("player_id").unwrap(),
+            name: row.get::<&str>("player_name").unwrap().to_owned(),
+            voted_out: parse_date(row.get::<&str>("player_voted_out"), SQLITE_DATE_FMT)
+                .expect("could not parse date")
+                .is_some(),
+        };
+        map.entry(id)
+            .and_modify(|f| f.players.push(player.clone()))
+            .or_insert(Drafter {
+                name: row.get::<&str>("drafter_name").unwrap().to_owned(),
+                season,
+                players: vec![player],
+            });
+    });
+    let drafters = map.into_values().collect::<Vec<Drafter>>();
+    let body = serde_json::to_string(&drafters)?;
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .body(body)
+        .build())
 }
 
-// /drafted/:drafter
-pub fn get_drafted_for_drafter(_req: Request, params: Params) -> anyhow::Result<impl IntoResponse> {
-    let drafter = params.get("drafter").expect("DRAFTER");
-    let store = Store::open_default()?;
-    let drafted = store.get(drafter)?;
-    match drafted {
-        Some(drafted) => {
-            let alive = String::from_utf8(store.get(STILL_ALIVE)?.unwrap_or_default())?;
-            let alive = alive.split(',').collect::<Vec<&str>>();
-            let drafted_status: String = String::from_utf8(drafted)?
-                .split(',')
-                .map(|d| {
-                    if alive.contains(&d) {
-                        format!("{}+", d)
-                    } else {
-                        format!("{}-", d)
-                    }
-                })
-                .map(|s| s.to_string() + ",")
-                .collect();
-            Ok(Response::new(200, drafted_status))
-        }
-        None => Ok(Response::new(
-            404,
-            format!("Drafter {} not found", drafter).to_string(),
-        )),
+// /join
+pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+    if !open_draft()? {
+        return Ok(Response::new(400, "Draft is closed".to_string()));
     }
-}
-
-// /join/:drafter
-pub fn join_draft(req: Request, params: Params) -> anyhow::Result<impl IntoResponse> {
-    let drafter = params.get("drafter").expect("DRAFTER");
-    let store = Store::open_default()?;
-    let body = req.body();
-    let drafted = String::from_utf8(body.into())?;
+    let draft_request = serde_json::from_slice::<DraftRequest>(req.body())?;
+    let drafted = draft_request.players;
+    let drafter = draft_request.drafter;
+    let season = current_season()?;
+    let conn = Connection::open_default()?;
     if drafted.is_empty() {
         return Ok(Response::new(400, "No drafted players".to_string()));
     }
-    let players = String::from_utf8(store.get(PLAYERS)?.unwrap_or_default())?;
-    let players = players.split(',').collect::<Vec<&str>>();
-    let drafted = drafted.split(',').collect::<Vec<&str>>();
-    for d in drafted.iter() {
-        if !players.contains(d) {
-            return Ok(Response::new(
-                400,
-                format!("Player {} not found", d).to_string(),
-            ));
-        }
+    let query = format!("SELECT * FROM players WHERE season = {season};");
+    let rowset = conn.execute(&query, &[])?;
+    let players = rowset
+        .rows()
+        .map(|row| Player {
+            name: row.get::<&str>("name").unwrap().to_owned(),
+            id: row.get::<u32>("id").unwrap(),
+            voted_out: parse_date(row.get::<&str>("voted_out"), SQLITE_DATE_FMT)
+                .expect("could not parse date")
+                .is_some(),
+        })
+        .collect::<Vec<Player>>();
+    let players = players
+        .iter()
+        .filter(|p| drafted.contains(&p.name))
+        .collect::<Vec<&Player>>();
+    if players.len() != NUMBER_OF_DRAFTS as usize {
+        return Ok(Response::new(
+            400,
+            format!("Must draft exactly 3 players from season {season}"),
+        ));
     }
-    store.set(drafter, body)?;
-    let drafters = store.get(DRAFTERS)?.unwrap_or_default();
-    if drafters.is_empty() {
-        store.set(DRAFTERS, drafter.as_bytes())?;
-    } else {
-        store.set(
-            DRAFTERS,
-            format!("{},{}", String::from_utf8(drafters)?, drafter).as_bytes(),
-        )?;
+    // First remove the drafter
+    // TODO ensure people are using their full names
+    let query = format!("DELETE FROM drafters WHERE name = '{drafter}' AND season = {season};");
+    conn.execute(&query, &[])?;
+
+    let insert_drafter_query =
+        format!("INSERT OR IGNORE INTO drafters (name, season) VALUES ('{drafter}', {season});");
+    let drafter_id_query =
+        format!("SELECT id FROM drafters WHERE name = '{drafter}' AND season = {season};");
+    conn.execute(&insert_drafter_query, &[])?;
+    let drafter_id = conn
+        .execute(&drafter_id_query, &[])
+        .unwrap()
+        .rows()
+        .next()
+        .unwrap()
+        .get::<u32>("id")
+        .unwrap();
+    for player in players {
+        conn.execute(&format!("INSERT OR IGNORE INTO drafterDrafts (drafter_id, player_id) VALUES ({drafter_id}, {});", player.id), &[])?;
     }
     Ok(Response::new(
         200,
@@ -131,26 +210,15 @@ pub fn join_draft(req: Request, params: Params) -> anyhow::Result<impl IntoRespo
     ))
 }
 
-// /leave/:drafter
-pub fn leave_draft(_req: Request, params: Params) -> anyhow::Result<impl IntoResponse> {
-    let drafter = params.get("drafter").expect("DRAFTER");
-    let store = Store::open_default()?;
-    if store.get(drafter)?.is_none() {
-        return Ok(Response::new(
-            404,
-            format!("Drafter {} not found", drafter).to_string(),
-        ));
+fn parse_date(date: Option<&str>, fmt: &str) -> anyhow::Result<Option<NaiveDate>> {
+    match date {
+        Some(date_str) => {
+            if date_str.is_empty() {
+                return Ok(None);
+            }
+            let parsed_date = NaiveDate::parse_from_str(date_str, fmt)?;
+            Ok(Some(parsed_date))
+        }
+        None => Ok(None),
     }
-    store.delete(drafter)?;
-    let drafters = store.get(DRAFTERS)?.unwrap_or_default();
-    let drafters = String::from_utf8(drafters)?
-        .split(',')
-        .filter(|d| d != &drafter && !d.is_empty())
-        .map(|x| x.to_string() + ",")
-        .collect::<String>();
-    store.set(DRAFTERS, drafters.as_bytes())?;
-    Ok(Response::new(
-        200,
-        format!("Drafter {} removed", drafter).to_string(),
-    ))
 }

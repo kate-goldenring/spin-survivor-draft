@@ -6,6 +6,12 @@ version = "0.1.0"
 authors = ["Kate Goldenring <kate.goldenring@fermyon.com>"]
 description = "Draft"
 
+[variables]
+season = { required = true }
+draft_deadline = { default = "2025-09-25T03:00:00" } # format: "2024-09-25T03:00:00"
+sqlite_username = { required = true }
+sqlite_password = { required = true }
+
 [[trigger.http]]
 route = "/api/..."
 component = "survivor-draft"
@@ -13,7 +19,10 @@ component = "survivor-draft"
 [component.survivor-draft]
 source = "target/wasm32-wasi/release/survivor_draft.wasm"
 allowed_outbound_hosts = []
-key_value_stores = ["default"]
+sqlite_databases = ["default"]
+[component.survivor-draft.variables]
+season = "{{ season }}"
+draft_deadline = "{{ draft_deadline }}"
 [component.survivor-draft.build]
 command = "cargo build --target wasm32-wasi --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
@@ -27,18 +36,13 @@ source = { url = "https://github.com/fermyon/spin-fileserver/releases/download/v
 files = [{ source = "assets", destination = "/" }]
 
 [[trigger.http]]
-component = "kv-explorer"
-route = "/internal/kv-explorer/..."
+component = "spin-sqlite-explorer"
+route = "/internal/sqlite/..."
 
-[component.kv-explorer]
-source = { url = "https://github.com/fermyon/spin-kv-explorer/releases/download/v0.10.0/spin-kv-explorer.wasm", digest = "sha256:65bc286f8315746d1beecd2430e178f539fa487ebf6520099daae09a35dbce1d" }
-allowed_outbound_hosts = ["redis://*:*", "mysql://*:*", "postgres://*:*"]
-# add or remove stores you want to explore here
-key_value_stores = ["default"]
+[component.spin-sqlite-explorer]
+source = { url = "https://github.com/karthik2804/spin-sqlite-web-cli/releases/download/v0.1.0/spin-sqlite-web-cli.wasm", digest = "sha256:2bab8dca3c50bc082c543ce9e9b367aec03e9de1efd62c6b748035bd9de48356" }
+sqlite_databases = ["default"]
 
-[component.kv-explorer.variables]
-kv_credentials = "{{ kv_explorer_user }}:{{ kv_explorer_password }}"
-
-[variables]
-kv_explorer_user = { required = true }
-kv_explorer_password = { required = true }
+[component.spin-sqlite-explorer.variables]
+sqlite_username = "{{ sqlite_username }}"
+sqlite_password = "{{ sqlite_password }}"
