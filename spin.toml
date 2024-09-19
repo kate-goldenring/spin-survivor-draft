@@ -2,7 +2,7 @@ spin_manifest_version = 2
 
 [application]
 name = "survivor-draft"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Kate Goldenring <kate.goldenring@fermyon.com>"]
 description = "Draft"
 
