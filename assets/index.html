@@ -10,10 +10,15 @@
 </head>
 <body>
     <div id="app" class="container">
+        <!-- Conditional Deadline Header Box -->
+        <div v-if="showDeadline" class="deadline-header">
+            Deadline to join draft is {{ formattedDeadline }}
+        </div>
+
         <img class="header-image" src="survivor_47_logo.webp" alt="Survivor Logo">
         <h1>Survivor Draft</h1>
 
-        <!-- Draft List in a Grid -->
+        <!-- Draft List -->
         <div class="draft-grid">
             <div v-for="drafter in drafters" :key="drafter.name" class="drafter-card">
                 <h3>{{ drafter.name }}</h3>
@@ -33,15 +38,45 @@
         new Vue({
             el: '#app',
             data: {
-                drafters: []
+                drafters: [],
+                deadline: null,
+                showDeadline: false
+            },
+            computed: {
+                // Format the deadline to Pacific Time
+                formattedDeadline() {
+                    if (this.deadline) {
+                        const deadlineDate = new Date(this.deadline);
+                        return this.convertToPacificTime(deadlineDate);
+                    }
+                    return '';
+                }
             },
             mounted() {
-                // Fetch drafts from the API
+                // Fetch drafts and deadline
                 fetch('/api/drafters')
                     .then(response => response.json())
                     .then(data => {
                         this.drafters = data;
                     });
+
+                fetch('/api/deadline')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.deadline = data.deadline;
+                        this.checkDeadline();
+                    });
+            },
+            methods: {
+                checkDeadline() {
+                    const now = new Date();
+                    const deadlineDate = new Date(this.deadline);
+                    this.showDeadline = now < deadlineDate;
+                },
+                convertToPacificTime(date) {
+                    const utcDate = new Date(date + "Z");
+                    return utcDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'full', timeStyle: 'short' });
+                }
             }
         });
     </script>

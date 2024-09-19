@@ -42,6 +42,7 @@ async fn handle_survivor_draft(req: Request) -> anyhow::Result<impl IntoResponse
     router.get("/api/players", get_players);
     router.post("/api/join", join_draft);
     router.post("/api/vote-out", vote_out);
+    router.get("/api/deadline", deadline);
 
     Ok(router.handle(req))
 }
@@ -69,7 +70,7 @@ fn current_season() -> anyhow::Result<i32> {
         .map_err(|_| anyhow::anyhow!("Configured season cannot be parsed as i32"))
 }
 
-fn open_draft() -> anyhow::Result<bool> {
+fn draft_is_open() -> anyhow::Result<bool> {
     let deadline = variables::get("draft_deadline").context("could not get draft_deadline")?;
     parse_date(Some(&deadline), DRAFT_DEADLINE_DATE_FORMAT)
         .map(|date| date.unwrap() > Utc::now().naive_utc().date())
@@ -145,7 +146,7 @@ WHERE p.season = {season};"
 
 // /join
 pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
-    if !open_draft()? {
+    if !draft_is_open()? {
         return Ok(Response::new(400, "Draft is closed".to_string()));
     }
     let draft_request = serde_json::from_slice::<DraftRequest>(req.body())?;
@@ -192,6 +193,22 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
         200,
         format!("Drafter {} joined", drafter).to_string(),
     ))
+}
+
+// /deadline/
+pub fn deadline(_req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+    let deadline = variables::get("draft_deadline").context("could not get draft_deadline")?;
+    let json = {
+        format!(
+            "{{ \"deadline\": \"{}\" }}",
+            deadline
+        )
+    };
+    Ok(Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .body(json)
+        .build())
 }
 
 fn parse_date(date: Option<&str>, fmt: &str) -> anyhow::Result<Option<NaiveDate>> {

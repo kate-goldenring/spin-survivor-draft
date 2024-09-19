@@ -9,6 +9,10 @@
 </head>
 <body>
     <div id="app" class="container">
+        <!-- Conditional Deadline Header Box -->
+        <div v-if="showDeadline" class="deadline-header">
+            Deadline to join draft passed
+        </div>
         <h2>Submit Your Draft</h2>
 
         <!-- Players List -->
@@ -67,6 +71,8 @@
                 player1: '',
                 player2: '',
                 player3: '',
+                deadline: null,
+                showDeadline: false,
                 errorMessage: '' // Store error message
             },
             mounted() {
@@ -75,6 +81,13 @@
                     .then(response => response.json())
                     .then(data => {
                         this.players = data;
+                    });
+                
+                fetch('/api/deadline')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.deadline = data.deadline;
+                        this.deadlinePassed();
                     });
             },
             computed: {
@@ -114,6 +127,11 @@
                         this.player3 = '';
                     })
                     .catch(error => console.error('Error submitting draft', error));
+                },
+                deadlinePassed() {
+                    const now = new Date();
+                    const deadlineDate = new Date(this.deadline);
+                    this.showDeadline = now > deadlineDate;
                 }
             }
         });

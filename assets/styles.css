@@ -43,6 +43,15 @@ li {
     display: block;
 }
 
+.deadline-header {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
 .voted-out-player {
     text-decoration: line-through;
     color: #e74c3c;
@@ -136,3 +145,4 @@ padding-left: 0;
         max-width: 200px;
     }
 }
+
