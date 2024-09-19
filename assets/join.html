@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Survivor Draft</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app" class="container">
+        <h2>Submit Your Draft</h2>
+
+        <!-- Players List -->
+        <div>
+            <h3>Season Players</h3>
+            <ul class="player-grid">
+                <li v-for="player in players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
+                    {{ player.name }}
+                </li>
+            </ul>
+        </div>
+
+        <!-- Draft Form -->
+        <form id="draftForm" @submit.prevent="handleSubmit">
+            <label for="drafter">Your Name:</label>
+            <input type="text" v-model="drafterName" required><br><br>
+
+            <label for="player1">Draft Player 1:</label>
+            <select v-model="player1" required>
+                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                    {{ player.name }}
+                </option>
+            </select><br><br>
+
+            <label for="player2">Draft Player 2:</label>
+            <select v-model="player2" required>
+                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                    {{ player.name }}
+                </option>
+            </select><br><br>
+
+            <label for="player3">Draft Player 3:</label>
+            <select v-model="player3" required>
+                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                    {{ player.name }}
+                </option>
+            </select><br><br>
+
+            <!-- Error Message -->
+            <div v-if="errorMessage" class="error-message">
+                {{ errorMessage }}
+            </div>
+
+            <button type="submit">Submit Draft</button>
+        </form>
+
+        <a href="index.html" class="back-link">Back to Drafts</a>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                players: [],
+                drafterName: '',
+                player1: '',
+                player2: '',
+                player3: '',
+                errorMessage: '' // Store error message
+            },
+            mounted() {
+                // Fetch players for the join form
+                fetch('/api/players')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.players = data;
+                    });
+            },
+            computed: {
+                // Available players filter out players who have been voted out
+                availablePlayers() {
+                    return this.players.filter(player => !player.voted_out);
+                }
+            },
+            methods: {
+                handleSubmit() {
+                    this.errorMessage = ''; // Reset error message
+
+                    // Ensure no duplicate players are drafted
+                    if (new Set([this.player1, this.player2, this.player3]).size < 3) {
+                        this.errorMessage = "You cannot draft the same player more than once.";
+                        return;
+                    }
+
+                    // If validation passes, send the draft data
+                    const draftData = {
+                        drafter: this.drafterName,
+                        players: [this.player1, this.player2, this.player3]
+                    };
+
+                    fetch('/api/join', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(draftData)
+                    })
+                    .then(() => {
+                        // Clear the form fields after successful submission
+                        this.drafterName = '';
+                        this.player1 = '';
+                        this.player2 = '';
+                        this.player3 = '';
+                    })
+                    .catch(error => console.error('Error submitting draft', error));
+                }
+            }
+        });
+    </script>
+</body>
+</html>

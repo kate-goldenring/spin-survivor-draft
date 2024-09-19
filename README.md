@@ -5,13 +5,13 @@
 Run application, setting a username and password for the SQLite explorer, the survivor season, and the drafting deadline in UTC.
 
 ```sh
-SPIN_VARIABLE_DRAFT_DEADLINE="2025-09-03T03:00:00" SPIN_VARIABLE_SQLITE_USERNAME=kate SPIN_VARIABLE_SQLITE_PASSWORD=pw SPIN_VARIABLE_SEASON=47 spin build -u --sqlite="@migration.sql"
+SPIN_VARIABLE_DRAFT_DEADLINE="2025-09-03T03:00:00" SPIN_VARIABLE_SQLITE_USERNAME=kate SPIN_VARIABLE_SQLITE_PASSWORD=pw SPIN_VARIABLE_SEASON=47 spin build -u --sqlite="@migration.up.sql"
 ```
 
 Initialize players
 
 1. Get a list of all players and add to a text file with one player per line
-2. Generate the migration file for the given list of players and season. Run this migration on your database directly using `sqlit3` or during the next `spin up`.
+2. Generate the migration file for the given list of players and season. Run this migration on your database directly using `sqlite3` or during the next `spin up`.
 
     ```sh
     ./generate-players-migration.sh players-46.txt 46

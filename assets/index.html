@@ -4,139 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Survivor Draft</title>
-    <style>
-        /* Basic styling */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-        }
-        h2 {
-            margin-top: 0;
-        }
-        .voted-out-player {
-            text-decoration: line-through;
-        }
-        .header-image {
-            width: 100%;
-            max-width: 800px;
-            margin-bottom: 20px;
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <img class="header-image" src="survivor.png" alt="Survivor Logo">
-        <h1>Survivor Draft</h2>
-        <div id="players">
-            <h2>Players</h3>
-            <ul></ul>
-        </div>
-        <br>
-        <br>
-        <div id="drafters">
-            <h2>Drafts</h3>
-            <ul></ul>
-        </div>
-        <div id="join">
-            <h2>Submit Your Draft</h1>
+    <div id="app" class="container">
+        <img class="header-image" src="survivor_47_logo.webp" alt="Survivor Logo">
+        <h1>Survivor Draft</h1>
 
-            <form id="draftForm" action="javascript:handleSubmit()" method="POST">
-                <label for="drafter">Your Name:</label>
-                <input type="text" id="drafter" name="drafter" required><br><br>
-        
-                <label for="player1">Draft Player 1:</label>
-                <input type="text" id="player1" name="player1" required><br><br>
-        
-                <label for="player2">Draft Player 2:</label>
-                <input type="text" id="player2" name="player2" required><br><br>
-        
-                <label for="player3">Draft Player 3:</label>
-                <input type="text" id="player3" name="player3" required><br><br>
-        
-                <button type="submit">Submit Draft</button>
-            </form>
+        <!-- Draft List in a Grid -->
+        <div class="draft-grid">
+            <div v-for="drafter in drafters" :key="drafter.name" class="drafter-card">
+                <h3>{{ drafter.name }}</h3>
+                <ul>
+                    <li v-for="player in drafter.players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
+                        {{ player.name }}
+                    </li>
+                </ul>
+            </div>
         </div>
+
+        <!-- Link to join form page -->
+        <a href="join.html" class="join-link">Join the Draft</a>
     </div>
 
-</body>
-<script>
-    function handleSubmit() {
-        const drafterName = document.getElementById('drafter').value;
-        const player1 = document.getElementById('player1').value;
-        const player2 = document.getElementById('player2').value;
-        const player3 = document.getElementById('player3').value;
-
-        if (!drafterName || !player1 || !player2 || !player3) {
-            alert('All fields are required');
-            event.preventDefault();
-        }
-        const data = {
-            drafter: drafterName,
-            players: [player1, player2, player3]
-        };
-        fetch('/api/join', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                drafters: []
             },
-            body: JSON.stringify(data)
-        })
-        .catch(error => console.error('Error submitting draft', error));
-    }
-    
-    // Fetch players from backend endpoints
-    fetch('/api/players')
-        .then(response => response.json())
-        .then(players => {
-            console.log(players);
-            // Loop through each drafter
-            players.forEach(player => {
-                let playerElement = document.createElement('li');
-                let playerName = player.name.trim(); // Remove leading/trailing spaces
-                const votedOut = player.voted_out;// Remove '+' or '-'
-                playerElement.textContent = playerName;
-                if (votedOut) {
-                    playerElement.classList.add('voted-out-player'); // Apply class for strikethrough
-                }
-                document.getElementById('players').appendChild(playerElement);
-            });
-        })
-        .catch(error => console.error('Error fetching data:', error));
-    // Fetch drafts from backend endpoints
-    fetch('/api/drafters')
-        .then(response => response.json())
-        .then(drafters => {
-            console.log(drafters);
-            // Loop through each drafter
-            drafters.forEach(drafterObj => {
-                drafter = drafterObj.name;
-                // Create a new element for each drafter
-                const drafterElement = document.createElement('div');
-                drafterElement.innerHTML = `<h3>${drafter}</h3><ul id="${drafter}-drafts"></ul>`;
-                document.getElementById('drafters').appendChild(drafterElement);
-                draftedPlayers = drafterObj.players;
-                    // Loop through drafted players and display them
-                    draftedPlayers.forEach(player => {
-                        let playerElement = document.createElement('li');
-                        let playerName = player.name.trim(); // Remove leading/trailing spaces
-                        const votedOut = player.voted_out;// Remove '+' or '-'
-                        playerElement.textContent = playerName;
-                        if (votedOut) {
-                            playerElement.classList.add('voted-out-player'); // Apply class for strikethrough
-                        }
-                        document.getElementById(`${drafter}-drafts`).appendChild(playerElement);
+            mounted() {
+                // Fetch drafts from the API
+                fetch('/api/drafters')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.drafters = data;
                     });
-            });
-        })
-        .catch(error => console.error('Error fetching data:', error));
-</script>
+            }
+        });
+    </script>
+</body>
 </html>

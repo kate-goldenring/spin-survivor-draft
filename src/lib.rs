@@ -18,7 +18,6 @@ const DRAFT_DEADLINE_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 
 #[derive(Serialize, Debug, Clone)]
 struct Player {
-    id: u32,
     name: String,
     voted_out: bool,
 }
@@ -86,7 +85,6 @@ pub fn get_players(_req: Request, _params: Params) -> anyhow::Result<impl IntoRe
     let players: Vec<Player> = rowset
         .rows()
         .map(|row| Player {
-            id: row.get::<u32>("id").unwrap(),
             name: row.get::<&str>("name").unwrap().to_owned(),
             voted_out: parse_date(row.get::<&str>("voted_out"), SQLITE_DATE_FMT)
                 .expect("could not parse date")
@@ -109,23 +107,20 @@ pub fn get_drafters(_req: Request, _params: Params) -> anyhow::Result<impl IntoR
         "SELECT 
   d.name AS drafter_name,
   d.season AS drafter_season,
-  d.id AS drafter_id,
-  p.id AS player_id,
   p.name AS player_name,
   p.season AS player_season,
   p.voted_out AS player_voted_out
 FROM drafters d
-JOIN drafterDrafts dd ON d.id = dd.drafter_id
-JOIN players p ON dd.player_id = p.id
+JOIN drafterDrafts dd ON d.name = dd.drafter_id
+JOIN players p ON dd.player_id = p.name
 WHERE p.season = {season};"
     );
     let rowset = conn.execute(&query, &[])?;
-    let mut map: HashMap<u32, Drafter> = HashMap::new();
+    let mut map: HashMap<&str, Drafter> = HashMap::new();
 
     rowset.rows().for_each(|row| {
-        let id = row.get::<u32>("drafter_id").unwrap();
+        let id = row.get::<&str>("drafter_name").unwrap();
         let player = Player {
-            id: row.get::<u32>("player_id").unwrap(),
             name: row.get::<&str>("player_name").unwrap().to_owned(),
             voted_out: parse_date(row.get::<&str>("player_voted_out"), SQLITE_DATE_FMT)
                 .expect("could not parse date")
@@ -167,7 +162,6 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
         .rows()
         .map(|row| Player {
             name: row.get::<&str>("name").unwrap().to_owned(),
-            id: row.get::<u32>("id").unwrap(),
             voted_out: parse_date(row.get::<&str>("voted_out"), SQLITE_DATE_FMT)
                 .expect("could not parse date")
                 .is_some(),
@@ -190,19 +184,9 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
 
     let insert_drafter_query =
         format!("INSERT OR IGNORE INTO drafters (name, season) VALUES ('{drafter}', {season});");
-    let drafter_id_query =
-        format!("SELECT id FROM drafters WHERE name = '{drafter}' AND season = {season};");
     conn.execute(&insert_drafter_query, &[])?;
-    let drafter_id = conn
-        .execute(&drafter_id_query, &[])
-        .unwrap()
-        .rows()
-        .next()
-        .unwrap()
-        .get::<u32>("id")
-        .unwrap();
     for player in players {
-        conn.execute(&format!("INSERT OR IGNORE INTO drafterDrafts (drafter_id, player_id) VALUES ({drafter_id}, {});", player.id), &[])?;
+        conn.execute(&format!("INSERT OR IGNORE INTO drafterDrafts (drafter_id, player_id) VALUES ('{drafter}', '{}');", player.name), &[])?;
     }
     Ok(Response::new(
         200,
