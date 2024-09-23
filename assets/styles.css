@@ -112,6 +112,11 @@ list-style-type: none;
 padding-left: 0;
 }
 
+.blurred {
+    filter: blur(8px);
+    pointer-events: none; /* Prevents interaction with blurred content */
+}
+
 /* Grid styling for the player list */
 .player-grid {
     display: grid;

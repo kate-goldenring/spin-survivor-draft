@@ -23,7 +23,7 @@
             <div v-for="drafter in drafters" :key="drafter.name" class="drafter-card">
                 <h3>{{ drafter.name }}</h3>
                 <ul>
-                    <li v-for="player in drafter.players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
+                    <li v-for="player in drafter.players" :key="player.name" :class="{'voted-out-player': player.voted_out, 'blurred': showDeadline}">
                         {{ player.name }}
                     </li>
                 </ul>
