@@ -18,18 +18,22 @@
         <img class="header-image" src="survivor_47_logo.webp" alt="Survivor Logo">
         <h1>Survivor Draft</h1>
 
+        <!-- Reveal Voted Out Players Checkbox -->
+        <div class="reveal-checkbox">
+            <input type="checkbox" id="revealVotedOut" v-model="revealVotedOutPlayers">
+            <label for="revealVotedOut">Reveal Voted Out Players</label>
+        </div>
         <!-- Draft List -->
         <div class="draft-grid">
             <div v-for="drafter in drafters" :key="drafter.name" class="drafter-card">
                 <h3>{{ drafter.name }}</h3>
                 <ul>
-                    <li v-for="player in drafter.players" :key="player.name" :class="{'voted-out-player': player.voted_out, 'blurred': showDeadline}">
+                    <li v-for="player in drafter.players" :key="player.name" :class="{'voted-out-player': player.voted_out && revealVotedOutPlayers,'blurred': showDeadline}">
                         {{ player.name }}
                     </li>
                 </ul>
             </div>
         </div>
-
         <!-- Link to join form page -->
         <a href="join.html" class="join-link">Join the Draft</a>
     </div>
@@ -40,7 +44,8 @@
             data: {
                 drafters: [],
                 deadline: null,
-                showDeadline: false
+                showDeadline: false,
+                revealVotedOutPlayers: false,
             },
             computed: {
                 // Format the deadline to Pacific Time
