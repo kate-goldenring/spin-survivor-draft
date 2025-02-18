@@ -20,6 +20,7 @@
             <h3>Season Players</h3>
             <ul class="player-grid">
                 <li v-for="player in players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
+                    <img :src="`players/${player.name.replace(/[^a-zA-Z0-9]/g, '')}.jpg`" :alt="player.name" class="player-image" />
                     {{ player.name }}
                 </li>
             </ul>
