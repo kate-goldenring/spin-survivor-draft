@@ -3,62 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join Survivor Draft</title>
+    <title>Survivor Admin - Vote Out Player</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .login-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 300px;
+        }
+        
+        .login-title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        .login-button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .login-error {
+            color: red;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <div id="app" class="container">
-        <h2>Vote Out Player</h2>
-
-        <!-- Players List -->
-        <div>
-            <h3>Season Players</h3>
-            <ul class="player-grid">
-                <li v-for="player in players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
-                    <img :src="`players/${player.name.replace(/[^a-zA-Z0-9]/g, '')}.jpg`" :alt="player.name" class="player-image" />
-                    {{ player.name }}
-                </li>
-            </ul>
+    <div id="app">
+        <!-- Login Overlay -->
+        <div class="login-overlay" v-if="!isAuthenticated">
+            <div class="login-container">
+                <h2 class="login-title">Admin Login</h2>
+                <form @submit.prevent="handleLogin">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            v-model="username" 
+                            required
+                            autocomplete="username"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            v-model="password" 
+                            required
+                            autocomplete="current-password"
+                        />
+                    </div>
+                    <button type="submit" class="login-button">Login</button>
+                    <p class="login-error" v-if="loginError">{{ loginError }}</p>
+                </form>
+            </div>
         </div>
 
-        <!-- Draft Form -->
-        <form id="draftForm" @submit.prevent="handleSubmit">
-            <label for="player1">Player to vote out:</label>
-            <select v-model="player1" required>
-                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
-                    {{ player.name }}
-                </option>
-            </select><br><br>
+        <!-- Main Application (only shown when authenticated) -->
+        <div class="container" v-if="isAuthenticated">
+            <h2>Vote Out Player</h2>
 
-            <!-- Error Message -->
-            <div v-if="errorMessage" class="error-message">
-                {{ errorMessage }}
+            <!-- Players List -->
+            <div>
+                <h3>Season Players</h3>
+                <ul class="player-grid">
+                    <li v-for="player in players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
+                        <img :src="`players/${player.name.replace(/[^a-zA-Z0-9]/g, '')}.jpg`" :alt="player.name" class="player-image" />
+                        {{ player.name }}
+                    </li>
+                </ul>
             </div>
 
-            <button type="submit">Submit Draft</button>
-        </form>
+            <!-- Draft Form -->
+            <form id="draftForm" @submit.prevent="handleSubmit">
+                <label for="player1">Player to vote out:</label>
+                <select v-model="player1" required>
+                    <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                        {{ player.name }}
+                    </option>
+                </select><br><br>
 
-        <a href="index.html" class="back-link">Back to Drafts</a>
+                <!-- Error Message -->
+                <div v-if="errorMessage" class="error-message">
+                    {{ errorMessage }}
+                </div>
+
+                <button type="submit">Vote Out</button>
+            </form>
+
+            <a href="index.html" class="back-link">Back to Drafts</a>
+            <button @click="logout" class="logout-button">Logout</button>
+        </div>
     </div>
 
     <script>
         new Vue({
             el: '#app',
             data: {
+                isAuthenticated: false,
+                authToken: '',
+                username: '',
+                password: '',
+                loginError: '',
                 players: [],
                 playerVotedOut: '',
                 player1: '',
                 errorMessage: '' // Store error message
             },
             mounted() {
-                // Fetch players for the join form
-                fetch('/api/players')
-                    .then(response => response.json())
-                    .then(data => {
-                        this.players = data;
-                    });
-                
+                // Check if there's a saved token in localStorage
+                const savedToken = localStorage.getItem('survivorAuthToken');
+                if (savedToken) {
+                    this.authToken = savedToken;
+                    this.validateToken();
+                }
             },
             computed: {
                 // Available players filter out players who have been voted out
@@ -67,6 +164,108 @@
                 }
             },
             methods: {
+                async handleLogin() {
+                    try {
+                        // Generate SHA-256 hash of username:password
+                        const encoder = new TextEncoder();
+                        const credentials = `${this.username}:${this.password}`;
+                        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(credentials));
+                        
+                        // Convert hash to hex string
+                        const hashArray = Array.from(new Uint8Array(hashBuffer));
+                        const hashHex = hashArray
+                            .map(b => b.toString(16).padStart(2, '0'))
+                            .join('');
+                        
+                        // Create the Bearer token
+                        this.authToken = `Bearer ${hashHex}`;
+                        
+                        // Validate the token with your backend
+                        const response = await fetch('/api/validate', {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': this.authToken
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            // Save token for future sessions
+                            localStorage.setItem('survivorAuthToken', this.authToken);
+                            
+                            // Set authenticated state and load players
+                            this.isAuthenticated = true;
+                            this.loadPlayers();
+                            this.loginError = '';
+                        } else {
+                            this.loginError = 'Invalid username or password';
+                            this.authToken = '';
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        this.loginError = 'Login failed. Please try again.';
+                        this.authToken = '';
+                    }
+                },
+                
+                async validateToken() {
+                    try {
+                        // Validate existing token
+                        const response = await fetch('/api/validate', {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': this.authToken
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            this.isAuthenticated = true;
+                            this.loadPlayers();
+                        } else {
+                            // Clear invalid token
+                            localStorage.removeItem('survivorAuthToken');
+                            this.authToken = '';
+                        }
+                    } catch (error) {
+                        console.error('Token validation error:', error);
+                        localStorage.removeItem('survivorAuthToken');
+                        this.authToken = '';
+                    }
+                },
+                
+                logout() {
+                    this.isAuthenticated = false;
+                    this.authToken = '';
+                    localStorage.removeItem('survivorAuthToken');
+                    this.username = '';
+                    this.password = '';
+                },
+                
+                loadPlayers() {
+                    // Fetch players with the auth token
+                    fetch('/api/players', {
+                        headers: {
+                            'Authorization': this.authToken
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to load players');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.players = data;
+                    })
+                    .catch(error => {
+                        console.error('Error loading players:', error);
+                        this.errorMessage = 'Failed to load players. Please try again.';
+                        // If unauthorized, log out
+                        if (error.message.includes('401')) {
+                            this.logout();
+                        }
+                    });
+                },
+                
                 handleSubmit() {
                     this.errorMessage = ''; // Reset error message
 
@@ -78,15 +277,32 @@
                     fetch('/api/vote-out', {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Authorization': this.authToken
                         },
                         body: JSON.stringify(voteOutRequest)
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Error: ${response.status}`);
+                        }
+                        return response.json();
                     })
                     .then(() => {
                         // Clear the form fields after successful submission
                         this.player1 = '';
+                        // Reload the players to update the UI
+                        this.loadPlayers();
                     })
-                    .catch(error => console.error('Error voting out player', error));
+                    .catch(error => {
+                        console.error('Error voting out player', error);
+                        this.errorMessage = 'Failed to vote out player. Please try again.';
+                        
+                        // If unauthorized, log out
+                        if (error.message.includes('401')) {
+                            this.logout();
+                        }
+                    });
                 }
             }
         });

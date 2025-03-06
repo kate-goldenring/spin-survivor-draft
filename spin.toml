@@ -11,6 +11,8 @@ season = { required = true }
 draft_deadline = { default = "2025-09-25T03:00:00" } # format: "2024-09-25T03:00:00"
 sqlite_username = { required = true }
 sqlite_password = { required = true }
+admin_username = { required = true }
+admin_password = { required = true }
 
 [[trigger.http]]
 route = "/api/..."
@@ -22,6 +24,8 @@ allowed_outbound_hosts = []
 sqlite_databases = ["default"]
 [component.survivor-draft.variables]
 season = "{{ season }}"
+username = "{{ admin_username }}"
+password = "{{ admin_password }}"
 draft_deadline = "{{ draft_deadline }}"
 [component.survivor-draft.build]
 command = "cargo build --target wasm32-wasi --release"

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 use chrono::{NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use spin_sdk::http::{IntoResponse, Request, Response};
 use spin_sdk::{
     http::{Params, Router},
@@ -48,6 +49,7 @@ async fn handle_survivor_draft(req: Request) -> anyhow::Result<impl IntoResponse
     router.post("/api/join", join_draft);
     router.post("/api/vote-out", vote_out);
     router.get("/api/deadline", deadline);
+    router.get("/api/validate", validate);
 
     Ok(router.handle(req))
 }
@@ -222,4 +224,22 @@ fn parse_date(date: Option<&str>, fmt: &str) -> anyhow::Result<Option<NaiveDate>
         }
         None => Ok(None),
     }
+}
+
+pub fn validate(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+    let auth = req.header("authorization");
+    let Some(auth) = auth else {
+        return Ok(Response::new(401, "Unauthorized".to_string()));
+    };
+    let username = variables::get("username").context("no username configured")?;
+    let password = variables::get("password").context("no password configured")?;
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{}:{}", username, password));
+    let hash_result = hasher.finalize();
+    let hash_hex: String = hash_result.iter().map(|b| format!("{:02x}", b)).collect();
+    let bearer_token = format!("Bearer {}", hash_hex);
+    if auth.as_str().context("could not authenticate")? != bearer_token {
+        return Ok(Response::new(401, "Unauthorized".to_string()));
+    }
+    Ok(Response::new(200, "Authorized".to_string()))
 }
