@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Survivor Draft</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app" class="container">
+        <h2>Vote Out Player</h2>
+
+        <!-- Players List -->
+        <div>
+            <h3>Season Players</h3>
+            <ul class="player-grid">
+                <li v-for="player in players" :key="player.name" :class="{'voted-out-player': player.voted_out}">
+                    <img :src="`players/${player.name.replace(/[^a-zA-Z0-9]/g, '')}.jpg`" :alt="player.name" class="player-image" />
+                    {{ player.name }}
+                </li>
+            </ul>
+        </div>
+
+        <!-- Draft Form -->
+        <form id="draftForm" @submit.prevent="handleSubmit">
+            <label for="player1">Player to vote out:</label>
+            <select v-model="player1" required>
+                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                    {{ player.name }}
+                </option>
+            </select><br><br>
+
+            <!-- Error Message -->
+            <div v-if="errorMessage" class="error-message">
+                {{ errorMessage }}
+            </div>
+
+            <button type="submit">Submit Draft</button>
+        </form>
+
+        <a href="index.html" class="back-link">Back to Drafts</a>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                players: [],
+                playerVotedOut: '',
+                player1: '',
+                errorMessage: '' // Store error message
+            },
+            mounted() {
+                // Fetch players for the join form
+                fetch('/api/players')
+                    .then(response => response.json())
+                    .then(data => {
+                        this.players = data;
+                    });
+                
+            },
+            computed: {
+                // Available players filter out players who have been voted out
+                availablePlayers() {
+                    return this.players.filter(player => !player.voted_out);
+                }
+            },
+            methods: {
+                handleSubmit() {
+                    this.errorMessage = ''; // Reset error message
+
+                    // If validation passes, send the draft data
+                    const voteOutRequest = {
+                        player: this.player1
+                    };
+
+                    fetch('/api/vote-out', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(voteOutRequest)
+                    })
+                    .then(() => {
+                        // Clear the form fields after successful submission
+                        this.player1 = '';
+                    })
+                    .catch(error => console.error('Error voting out player', error));
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -35,6 +35,11 @@ struct DraftRequest {
     players: Vec<String>,
 }
 
+#[derive(Deserialize)]
+struct VoteOutRequest {
+    player: String,
+}
+
 #[http_component]
 async fn handle_survivor_draft(req: Request) -> anyhow::Result<impl IntoResponse> {
     let mut router = Router::new();
@@ -49,7 +54,7 @@ async fn handle_survivor_draft(req: Request) -> anyhow::Result<impl IntoResponse
 
 // /vote-out/
 pub fn vote_out(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
-    let player = String::from_utf8(req.body().into())?;
+    let player = serde_json::from_slice::<VoteOutRequest>(req.body())?.player;
     let season = current_season()?;
     let conn = Connection::open_default()?;
     let date = Utc::now().naive_utc().date();
@@ -151,7 +156,7 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
     }
     let draft_request = serde_json::from_slice::<DraftRequest>(req.body())?;
     let drafted = draft_request.players;
-    let drafter = draft_request.drafter;
+    let drafter = draft_request.drafter.trim();
     let season = current_season()?;
     let conn = Connection::open_default()?;
     if drafted.is_empty() {
@@ -198,12 +203,7 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
 // /deadline/
 pub fn deadline(_req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
     let deadline = variables::get("draft_deadline").context("could not get draft_deadline")?;
-    let json = {
-        format!(
-            "{{ \"deadline\": \"{}\" }}",
-            deadline
-        )
-    };
+    let json = { format!("{{ \"deadline\": \"{}\" }}", deadline) };
     Ok(Response::builder()
         .status(200)
         .header("content-type", "application/json")
