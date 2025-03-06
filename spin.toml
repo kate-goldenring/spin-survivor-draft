@@ -9,8 +9,6 @@ description = "Draft"
 [variables]
 season = { required = true }
 draft_deadline = { default = "2025-09-25T03:00:00" } # format: "2024-09-25T03:00:00"
-sqlite_username = { required = true }
-sqlite_password = { required = true }
 admin_username = { required = true }
 admin_password = { required = true }
 
@@ -48,5 +46,5 @@ source = { url = "https://github.com/karthik2804/spin-sqlite-web-cli/releases/do
 sqlite_databases = ["default"]
 
 [component.spin-sqlite-explorer.variables]
-sqlite_username = "{{ sqlite_username }}"
-sqlite_password = "{{ sqlite_password }}"
+sqlite_username = "{{ admin_username }}"
+sqlite_password = "{{ admin_password }}"

@@ -9,11 +9,11 @@
 </head>
 <body>
     <div id="app" class="container">
-        <!-- Conditional Deadline Header Box -->
-        <div v-if="showDeadline" class="deadline-header">
-            Deadline to join draft passed
+        <h2>Player Draft</h2>
+        <div v-if="draftEnded"> </div>
+        <p>Unfortunately, the deadline to join the draft has passed. Check back next season to join the fun!</p>
+        <div v-else>
         </div>
-        <h2>Submit Your Draft</h2>
 
         <!-- Players List -->
         <div>
@@ -27,39 +27,41 @@
         </div>
 
         <!-- Draft Form -->
-        <form id="draftForm" @submit.prevent="handleSubmit">
-            <label for="drafter">Your Name:</label>
-            <input type="text" v-model="drafterName" required><br><br>
+        <div v-if="draftEnded"> </div>
+        <div v-else>
+            <form id="draftForm" @submit.prevent="handleSubmit">
+                <label for="drafter">Your Name:</label>
+                <input type="text" v-model="drafterName" required><br><br>
 
-            <label for="player1">Draft Player 1:</label>
-            <select v-model="player1" required>
-                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
-                    {{ player.name }}
-                </option>
-            </select><br><br>
+                <label for="player1">Draft Player 1:</label>
+                <select v-model="player1" required>
+                    <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                        {{ player.name }}
+                    </option>
+                </select><br><br>
 
-            <label for="player2">Draft Player 2:</label>
-            <select v-model="player2" required>
-                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
-                    {{ player.name }}
-                </option>
-            </select><br><br>
+                <label for="player2">Draft Player 2:</label>
+                <select v-model="player2" required>
+                    <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                        {{ player.name }}
+                    </option>
+                </select><br><br>
 
-            <label for="player3">Draft Player 3:</label>
-            <select v-model="player3" required>
-                <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
-                    {{ player.name }}
-                </option>
-            </select><br><br>
+                <label for="player3">Draft Player 3:</label>
+                <select v-model="player3" required>
+                    <option v-for="player in availablePlayers" :key="player.name" :value="player.name">
+                        {{ player.name }}
+                    </option>
+                </select><br><br>
 
-            <!-- Error Message -->
-            <div v-if="errorMessage" class="error-message">
-                {{ errorMessage }}
-            </div>
+                <!-- Error Message -->
+                <div v-if="errorMessage" class="error-message">
+                    {{ errorMessage }}
+                </div>
 
-            <button type="submit">Submit Draft</button>
-        </form>
-
+                <button type="submit">Submit Draft</button>
+            </form>
+        </div>
         <a href="index.html" class="back-link">Back to Drafts</a>
     </div>
 
@@ -73,7 +75,7 @@
                 player2: '',
                 player3: '',
                 deadline: null,
-                showDeadline: false,
+                draftEnded: false,
                 errorMessage: '' // Store error message
             },
             mounted() {
@@ -132,7 +134,7 @@
                 deadlinePassed() {
                     const now = new Date();
                     const deadlineDate = new Date(this.deadline);
-                    this.showDeadline = now > deadlineDate;
+                    this.draftEnded = now > deadlineDate;
                 }
             }
         });
