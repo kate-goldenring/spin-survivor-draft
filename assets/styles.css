@@ -178,3 +178,39 @@ padding-left: 0;
 .admin-button:hover {
     background-color: #666;
 }
+
+/* CSS for scrolling banner starts */
+.scrolling-banner {
+    width: 100%;
+    overflow: hidden;
+    background-color: #ffe066;
+    border-bottom: 2px solid #ffa502;
+    padding: 10px 0;
+    font-weight: bold;
+    font-size: 1.2em;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+}
+
+.scrolling-text {
+    white-space: nowrap;
+    animation: scroll-left 30s linear infinite;
+}
+
+@keyframes scroll-left {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(-100%);
+    }
+}
+
+/* Adjust body top padding so content doesn't hide behind banner */
+body {
+    padding-top: 50px;
+}
+
+/* CSS for scrolling banner ends */

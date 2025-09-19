@@ -17,7 +17,7 @@ route = "/api/..."
 component = "survivor-draft"
 
 [component.survivor-draft]
-source = "target/wasm32-wasi/release/survivor_draft.wasm"
+source = "target/wasm32-wasip1/release/survivor_draft.wasm"
 allowed_outbound_hosts = []
 sqlite_databases = ["default"]
 [component.survivor-draft.variables]
@@ -26,7 +26,7 @@ username = "{{ admin_username }}"
 password = "{{ admin_password }}"
 draft_deadline = "{{ draft_deadline }}"
 [component.survivor-draft.build]
-command = "cargo build --target wasm32-wasi --release"
+command = "cargo build --target wasm32-wasip1 --release"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 [[trigger.http]]
