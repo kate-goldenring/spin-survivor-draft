@@ -21,6 +21,7 @@ const DRAFT_DEADLINE_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 struct Player {
     name: String,
     voted_out: bool,
+    image_url: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -97,6 +98,7 @@ pub fn get_players(_req: Request, _params: Params) -> anyhow::Result<impl IntoRe
             voted_out: parse_date(row.get::<&str>("voted_out"), SQLITE_DATE_FMT)
                 .expect("could not parse date")
                 .is_some(),
+            image_url: row.get::<&str>("image_url").map(|s| s.to_owned()),
         })
         .collect();
     let body = serde_json::to_string(&players)?;
@@ -133,6 +135,7 @@ WHERE p.season = {season};"
             voted_out: parse_date(row.get::<&str>("player_voted_out"), SQLITE_DATE_FMT)
                 .expect("could not parse date")
                 .is_some(),
+            image_url: row.get::<&str>("image_url").map(|s| s.to_owned()),
         };
         map.entry(id)
             .and_modify(|f| f.players.push(player.clone()))
@@ -173,6 +176,7 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
             voted_out: parse_date(row.get::<&str>("voted_out"), SQLITE_DATE_FMT)
                 .expect("could not parse date")
                 .is_some(),
+            image_url: None,
         })
         .collect::<Vec<Player>>();
     let players = players

@@ -2,10 +2,10 @@
 
 ## Example from Season 46
 
-Run application, setting a username and password for the SQLite explorer, the survivor season, and the drafting deadline in UTC.
+Run application, setting a username and password for the SQLite explorer, the admin username and password, the survivor season, and the drafting deadline in UTC.
 
 ```sh
-SPIN_VARIABLE_DRAFT_DEADLINE="2025-09-03T03:00:00" SPIN_VARIABLE_SQLITE_USERNAME=kate SPIN_VARIABLE_SQLITE_PASSWORD=pw SPIN_VARIABLE_SEASON=48 spin build -u --sqlite="@migrations/001_create_players_and_drafters.up.sql"
+SPIN_VARIABLE_DRAFT_DEADLINE="2025-09-03T03:00:00" SPIN_VARIABLE_SQLITE_USERNAME=kate SPIN_VARIABLE_SQLITE_PASSWORD=pw SPIN_VARIABLE_ADMIN_USERNAME=kate SPIN_VARIABLE_ADMIN_PASSWORD=pw SPIN_VARIABLE_SEASON=48 spin build -u --sqlite="@migrations/001_create_players_and_drafters.up.sql"
 ```
 
 Initialize players
