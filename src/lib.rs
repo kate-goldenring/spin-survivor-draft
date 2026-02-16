@@ -12,7 +12,7 @@ use spin_sdk::{
     variables,
 };
 
-// TODO make this a Spin application variable
+// TODO: make this a Spin application variable
 const NUMBER_OF_DRAFTS: u32 = 3;
 const SQLITE_DATE_FMT: &str = "%Y-%m-%d";
 const DRAFT_DEADLINE_DATE_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
@@ -187,7 +187,7 @@ pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResp
     }
     // First remove the drafter
     // TODO ensure people are using their full names
-    let query = format!("DELETE FROM drafters WHERE name = '{drafter}' AND season = {season};");
+    let query = format!("DELETE FROM drafters WHERE name = '{drafter}';");
     conn.execute(&query, &[])?;
 
     let insert_drafter_query =

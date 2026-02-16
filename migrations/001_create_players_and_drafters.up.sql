@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS players (
 
 CREATE TABLE IF NOT EXISTS drafters (
   name TEXT NOT NULL PRIMARY KEY,
-  season INTEGER
+// TODO -> remove this  season INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS drafterDrafts (

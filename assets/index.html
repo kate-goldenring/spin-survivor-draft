@@ -19,7 +19,7 @@
             Deadline to join draft is {{ formattedDeadline }}
         </div>
 
-        <img class="header-image" src="survivor_48_logo.jpg" alt="Survivor Logo">
+        <img class="header-image" src="survivor_49_logo.png" alt="Survivor Logo">
         <h1>Survivor Draft</h1>
 
         <!-- Reveal Voted Out Players Checkbox -->
@@ -60,7 +60,8 @@
                 // Format the deadline to Pacific Time
                 formattedDeadline() {
                     if (this.deadline) {
-                        const deadlineDate = new Date(this.deadline);
+                        const dateString = this.deadline.endsWith('Z') ? this.deadline : this.deadline + 'Z';
+                        const deadlineDate = new Date(dateString);
                         return this.convertToPacificTime(deadlineDate);
                     }
                     return '';
@@ -88,8 +89,7 @@
                     this.showDeadline = now < deadlineDate;
                 },
                 convertToPacificTime(date) {
-                    const utcDate = new Date(date + "Z");
-                    return utcDate.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'full', timeStyle: 'short' });
+                    return date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', dateStyle: 'full', timeStyle: 'short' });
                 }
             }
         });
