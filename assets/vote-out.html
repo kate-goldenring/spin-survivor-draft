@@ -6,64 +6,8 @@
     <title>Survivor Admin - Vote Out Player</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
     <link rel="stylesheet" href="styles.css">
-    <style>
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        
-        .login-container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            width: 300px;
-        }
-        
-        .login-title {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        
-        .login-button {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        
-        .login-error {
-            color: red;
-            margin-top: 10px;
-            text-align: center;
-        }
-    </style>
+    <link rel="stylesheet" href="auth.css">
+    <script src="auth.js"></script>
 </head>
 <body>
     <div id="app">
@@ -151,7 +95,7 @@
             },
             mounted() {
                 // Check if there's a saved token in localStorage
-                const savedToken = localStorage.getItem('survivorAuthToken');
+                const savedToken = SurvivorAuth.getToken();
                 if (savedToken) {
                     this.authToken = savedToken;
                     this.validateToken();
@@ -165,77 +109,34 @@
             },
             methods: {
                 async handleLogin() {
-                    try {
-                        // Generate SHA-256 hash of username:password
-                        const encoder = new TextEncoder();
-                        const credentials = `${this.username}:${this.password}`;
-                        const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(credentials));
-                        
-                        // Convert hash to hex string
-                        const hashArray = Array.from(new Uint8Array(hashBuffer));
-                        const hashHex = hashArray
-                            .map(b => b.toString(16).padStart(2, '0'))
-                            .join('');
-                        
-                        // Create the Bearer token
-                        this.authToken = `Bearer ${hashHex}`;
-                        
-                        // Validate the token with your backend
-                        const response = await fetch('/api/validate', {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': this.authToken
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            // Save token for future sessions
-                            localStorage.setItem('survivorAuthToken', this.authToken);
-                            
-                            // Set authenticated state and load players
-                            this.isAuthenticated = true;
-                            this.loadPlayers();
-                            this.loginError = '';
-                        } else {
-                            this.loginError = 'Invalid username or password';
-                            this.authToken = '';
-                        }
-                    } catch (error) {
-                        console.error('Login error:', error);
-                        this.loginError = 'Login failed. Please try again.';
+                    const result = await SurvivorAuth.login(this.username, this.password);
+
+                    if (result.success) {
+                        this.authToken = result.token;
+                        this.isAuthenticated = true;
+                        this.loadPlayers();
+                        this.loginError = '';
+                    } else {
+                        this.loginError = result.error;
                         this.authToken = '';
                     }
                 },
-                
+
                 async validateToken() {
-                    try {
-                        // Validate existing token
-                        const response = await fetch('/api/validate', {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': this.authToken
-                            }
-                        });
-                        
-                        if (response.ok) {
-                            this.isAuthenticated = true;
-                            this.loadPlayers();
-                        } else {
-                            // Clear invalid token
-                            localStorage.removeItem('survivorAuthToken');
-                            this.authToken = '';
-                        }
-                    } catch (error) {
-                        console.error('Token validation error:', error);
-                        localStorage.removeItem('survivorAuthToken');
+                    const isValid = await SurvivorAuth.validate(this.authToken);
+
+                    if (isValid) {
+                        this.isAuthenticated = true;
+                        this.loadPlayers();
+                    } else {
                         this.authToken = '';
                     }
                 },
-                
+
                 logout() {
                     this.isAuthenticated = false;
                     this.authToken = '';
-                    localStorage.removeItem('survivorAuthToken');
+                    SurvivorAuth.logout();
                     this.username = '';
                     this.password = '';
                 },

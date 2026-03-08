@@ -156,7 +156,11 @@ WHERE p.season = {season};"
 
 // /join
 pub fn join_draft(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
-    if !draft_is_open()? {
+    // Check if admin is authenticated
+    let is_admin = is_authenticated(&req);
+
+    // Only check deadline if not admin
+    if !is_admin && !draft_is_open()? {
         return Ok(Response::new(400, "Draft is closed".to_string()));
     }
     let draft_request = serde_json::from_slice::<DraftRequest>(req.body())?;
@@ -230,20 +234,29 @@ fn parse_date(date: Option<&str>, fmt: &str) -> anyhow::Result<Option<NaiveDate>
     }
 }
 
-pub fn validate(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+fn is_authenticated(req: &Request) -> bool {
     let auth = req.header("authorization");
     let Some(auth) = auth else {
-        return Ok(Response::new(401, "Unauthorized".to_string()));
+        return false;
     };
-    let username = variables::get("username").context("no username configured")?;
-    let password = variables::get("password").context("no password configured")?;
+    let Ok(username) = variables::get("username") else {
+        return false;
+    };
+    let Ok(password) = variables::get("password") else {
+        return false;
+    };
     let mut hasher = Sha256::new();
     hasher.update(format!("{}:{}", username, password));
     let hash_result = hasher.finalize();
     let hash_hex: String = hash_result.iter().map(|b| format!("{:02x}", b)).collect();
     let bearer_token = format!("Bearer {}", hash_hex);
-    if auth.as_str().context("could not authenticate")? != bearer_token {
-        return Ok(Response::new(401, "Unauthorized".to_string()));
+    auth.as_str().map(|s| s == bearer_token).unwrap_or(false)
+}
+
+pub fn validate(req: Request, _params: Params) -> anyhow::Result<impl IntoResponse> {
+    if is_authenticated(&req) {
+        Ok(Response::new(200, "Authorized".to_string()))
+    } else {
+        Ok(Response::new(401, "Unauthorized".to_string()))
     }
-    Ok(Response::new(200, "Authorized".to_string()))
 }

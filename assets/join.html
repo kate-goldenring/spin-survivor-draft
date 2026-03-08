@@ -6,11 +6,54 @@
     <title>Join Survivor Draft</title>
     <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="auth.css">
+    <script src="auth.js"></script>
 </head>
 <body>
-    <div id="app" class="container">
-        <h2>Player Draft</h2>
-        <div v-if="draftEnded"> <p>Unfortunately, the deadline to join the draft has passed. Check back next season to join the fun!</p></div>
+    <div id="app">
+        <!-- Admin Login Button -->
+        <button v-if="!isAuthenticated && !showLoginOverlay" @click="showLoginOverlay = true" class="admin-login-btn">
+            Admin Login
+        </button>
+
+        <!-- Login Overlay -->
+        <div class="login-overlay" v-if="showLoginOverlay && !isAuthenticated">
+            <div class="login-container">
+                <h2 class="login-title">Admin Login</h2>
+                <form @submit.prevent="handleLogin">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input
+                            type="text"
+                            id="username"
+                            v-model="username"
+                            required
+                            autocomplete="username"
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input
+                            type="password"
+                            id="password"
+                            v-model="password"
+                            required
+                            autocomplete="current-password"
+                        />
+                    </div>
+                    <button type="submit" class="login-button">Login</button>
+                    <button type="button" @click="showLoginOverlay = false" class="login-button" style="background-color: #ccc; margin-top: 10px;">Cancel</button>
+                    <p class="login-error" v-if="loginError">{{ loginError }}</p>
+                </form>
+            </div>
+        </div>
+
+        <div class="container">
+            <h2>
+                Player Draft
+                <span v-if="isAuthenticated" class="admin-badge">Admin Mode</span>
+            </h2>
+        <div v-if="draftEnded && !isAuthenticated"> <p>Unfortunately, the deadline to join the draft has passed. Check back next season to join the fun!</p></div>
         <div v-else>
             <p>Drafting rules: After watching the first episode of the series, choose the three players that you think will get the furthest in the game. The winning drafter is the person who drafts the season winner. Tie breakers are decided by who has drafted the runner up, third place player, and so on. You have until the second episode airs to draft your players. You can edit your selection as many times as you want before the deadline (be sure to use the same name when submitting your drafts).</p>
         </div>
@@ -27,7 +70,7 @@
         </div>
 
         <!-- Draft Form -->
-        <div v-if="draftEnded"> </div>
+        <div v-if="draftEnded && !isAuthenticated"> </div>
         <div v-else>
             <form id="draftForm" @submit.prevent="handleSubmit">
                 <label for="drafter">Your Name:</label>
@@ -63,6 +106,8 @@
             </form>
         </div>
         <a href="index.html" class="back-link">Back to Drafts</a>
+        <button v-if="isAuthenticated" @click="logout" class="logout-button">Logout</button>
+        </div>
     </div>
 
     <script>
@@ -76,16 +121,29 @@
                 player3: '',
                 deadline: null,
                 draftEnded: false,
-                errorMessage: '' // Store error message
+                errorMessage: '', // Store error message
+                isAuthenticated: false,
+                authToken: '',
+                username: '',
+                password: '',
+                loginError: '',
+                showLoginOverlay: false
             },
             mounted() {
+                // Check if there's a saved token in localStorage
+                const savedToken = SurvivorAuth.getToken();
+                if (savedToken) {
+                    this.authToken = savedToken;
+                    this.validateToken();
+                }
+
                 // Fetch players for the join form
                 fetch('/api/players')
                     .then(response => response.json())
                     .then(data => {
                         this.players = data;
                     });
-                
+
                 fetch('/api/deadline')
                     .then(response => response.json())
                     .then(data => {
@@ -100,6 +158,38 @@
                 }
             },
             methods: {
+                async handleLogin() {
+                    const result = await SurvivorAuth.login(this.username, this.password);
+
+                    if (result.success) {
+                        this.authToken = result.token;
+                        this.isAuthenticated = true;
+                        this.showLoginOverlay = false;
+                        this.loginError = '';
+                    } else {
+                        this.loginError = result.error;
+                        this.authToken = '';
+                    }
+                },
+
+                async validateToken() {
+                    const isValid = await SurvivorAuth.validate(this.authToken);
+
+                    if (isValid) {
+                        this.isAuthenticated = true;
+                    } else {
+                        this.authToken = '';
+                    }
+                },
+
+                logout() {
+                    this.isAuthenticated = false;
+                    this.authToken = '';
+                    SurvivorAuth.logout();
+                    this.username = '';
+                    this.password = '';
+                },
+
                 handleSubmit() {
                     this.errorMessage = ''; // Reset error message
 
@@ -115,11 +205,18 @@
                         players: [this.player1, this.player2, this.player3]
                     };
 
+                    const headers = {
+                        'Content-Type': 'application/json'
+                    };
+
+                    // Include auth token if admin is authenticated
+                    if (this.isAuthenticated && this.authToken) {
+                        headers['Authorization'] = this.authToken;
+                    }
+
                     fetch('/api/join', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: headers,
                         body: JSON.stringify(draftData)
                     })
                     .then(() => {
